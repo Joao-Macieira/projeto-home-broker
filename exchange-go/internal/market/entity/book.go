@@ -24,18 +24,28 @@ func NewBook(orderChan chan *Order, orderChanOutput chan *Order, wg *sync.WaitGr
 }
 
 func (book *Book) Trade() {
-	buyOrders := NewOrderQueue()
-	sellOrders := NewOrderQueue()
-
-	heap.Init(buyOrders)
-	heap.Init(sellOrders)
+	buyOrders := make(map[string]*OrderQueue)
+	sellOrders := make(map[string]*OrderQueue)
+	// heap.Init(sellOrders)
 
 	for order := range book.OrdersChan {
-		if order.OrderType == "BUY" {
-			buyOrders.Push(order)
+		asset := order.Asset.ID
 
-			if sellOrders.Len() > 0 && sellOrders.Orders[0].Price <= order.Price {
-				sellOrder := sellOrders.Pop().(*Order)
+		if buyOrders[asset] == nil {
+			buyOrders[asset] = NewOrderQueue()
+			heap.Init(buyOrders[asset])
+		}
+
+		if sellOrders[asset] == nil {
+			sellOrders[asset] = NewOrderQueue()
+			heap.Init(sellOrders[asset])
+		}
+
+		if order.OrderType == "BUY" {
+			buyOrders[asset].Push(order)
+
+			if sellOrders[asset].Len() > 0 && sellOrders[asset].Orders[0].Price <= order.Price {
+				sellOrder := sellOrders[asset].Pop().(*Order)
 
 				if sellOrder.PendingShares > 0 {
 					transaction := NewTransaction(sellOrder, order, order.Shares, sellOrder.Price)
@@ -48,15 +58,15 @@ func (book *Book) Trade() {
 					book.OrderChanOutput <- order
 
 					if sellOrder.PendingShares > 0 {
-						sellOrders.Push(sellOrder)
+						sellOrders[asset].Push(sellOrder)
 					}
 				}
 			}
 		} else if order.OrderType == "SELL" {
-			sellOrders.Push(order)
+			sellOrders[asset].Push(order)
 
-			if buyOrders.Len() > 0 && buyOrders.Orders[0].Price >= order.Price {
-				buyOrder := buyOrders.Pop().(*Order)
+			if buyOrders[asset].Len() > 0 && buyOrders[asset].Orders[0].Price >= order.Price {
+				buyOrder := buyOrders[asset].Pop().(*Order)
 
 				if buyOrder.PendingShares > 0 {
 					transaction := NewTransaction(order, buyOrder, order.Shares, buyOrder.Price)
@@ -69,7 +79,7 @@ func (book *Book) Trade() {
 					book.OrderChanOutput <- order
 
 					if buyOrder.PendingShares > 0 {
-						buyOrders.Push(buyOrder)
+						buyOrders[asset].Push(buyOrder)
 					}
 				}
 			}
