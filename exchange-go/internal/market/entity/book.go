@@ -26,7 +26,6 @@ func NewBook(orderChan chan *Order, orderChanOutput chan *Order, wg *sync.WaitGr
 func (book *Book) Trade() {
 	buyOrders := make(map[string]*OrderQueue)
 	sellOrders := make(map[string]*OrderQueue)
-	// heap.Init(sellOrders)
 
 	for order := range book.OrdersChan {
 		asset := order.Asset.ID
